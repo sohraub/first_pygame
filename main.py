@@ -59,12 +59,11 @@ def convert_shape_format(piece):
 
 def get_shadow(piece, grid):
     shadow = copy.deepcopy(piece)
-    for i in range(23)[::-1]:
+    for i in range(23):
         shadow.y = i
         shadow.color = (179, 179, 179)
         if not valid_space(shadow, grid):
-            continue
-        else:
+            shadow.y -= 1
             return shadow
 
 
@@ -150,35 +149,39 @@ def clear_rows(grid, locked):
     return inc
 
 
-def add_text(surface, text, x=0, y=0, color=(255, 255, 255), font='arial', size=30, middle=False):
+def add_text(surface, text, x=0, y=0, color=(255, 255, 255), font='arial', size=30, middle=None):
     font = pygame.font.SysFont(font, size)
     label = font.render(text, 1, color)
     if middle:
-        x = TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2)
-        y = TOP_LEFT_Y + PLAY_HEIGHT/2 - (label.get_height()/2)
+        if 'x' in middle:
+            x = TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2)
+        if 'y' in middle:
+            y = TOP_LEFT_Y + PLAY_HEIGHT/2 - (label.get_height()/2)
     surface.blit(label, (x, y))
     return label
 
 
-def update_score(new_score, text):
+def get_all_scores(location='scores.txt'):
     with open('scores.txt', 'r') as f:
-        score_list = [(x.split('|')[0], int(x.split('|')[1])) for x in f.readlines()]
+        return [(x.split('|')[0], int(x.split('|')[1])) for x in f.readlines()]
 
+
+def update_score(new_score, text):
+    score_list = get_all_scores()
     print(score_list)
-    if new_score > score_list[-1][1]:
+    if new_score > score_list[-1][1] or len(score_list) < 10:
         score_list.append((text, new_score))
 
     new_score_list = sorted(score_list, key=lambda x: x[1])[::-1][:10]
+    print(new_score_list)
 
     with open('scores.txt', 'w') as fo:
         for x in new_score_list:
-            fo.write('{}|{}'.format(x[0], x[1]))
+            fo.write('{}|{}\n'.format(x[0], x[1]))
 
 
 def max_score():
-    with open('scores.txt', 'r') as f:
-        score_list = [(x.split('|')[0], x.split('|')[1]) for x in f.readlines()]
-    return score_list[0][1]
+    return get_all_scores()[0][1]
 
 
 def main(win):
@@ -246,16 +249,6 @@ def main(win):
                         current_piece.x -= 1
                 elif event.key == pygame.K_DOWN:
                     fast_fall = True
-                    # current_piece.y = current_shadow.y
-                    # if not valid_space(current_piece, grid):
-                    #     current_piece.y -= 1
-                #     old_fall_speed = copy.copy(fall_speed)
-                #     while pygame.key.get_pressed()[pygame.K_DOWN]:
-                #         fall_speed = 0.05
-                #     fall_speed = old_fall_speed
-                #     # current_piece.y += 1
-                #     if not valid_space(current_piece, grid):
-                #         current_piece.y -= 1
                 elif event.key == pygame.K_UP:
                     current_piece.rotation = current_piece.rotation + 1 % len(current_piece.shape)
                     if not valid_space(current_piece, grid):
@@ -291,7 +284,7 @@ def main(win):
         pygame.display.update()
 
         if check_lost(locked_positions):
-            add_text(win, "GAME OVER", size=80, middle=True)
+            add_text(win, "GAME OVER", size=80, middle='xy')
             pygame.display.update()
             pygame.time.delay(1500)
             run = False
@@ -303,7 +296,7 @@ def main_menu(win):
     run = True
     while run:
         win.fill((0, 0, 0))
-        add_text(win, 'Press Any Key To Get Funky', size=60, middle=True)
+        add_text(win, 'Press Any Key To Get Funky', size=60, middle='xy')
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -315,7 +308,25 @@ def main_menu(win):
     pygame.display.quit()
 
 
-def high_score_screen(win, score):
+def high_score_screen(win, new_score):
+    update_leaderboard(win, new_score)
+    win.fill((0, 0, 0))
+    add_text(win, 'LEADERBOARD', size=40, y=30, middle='x')
+    scores = get_all_scores()
+    for i, score in enumerate(scores):
+        # Following line sets the color of score to gold for 1st place, silver for 2nd, bronze for 3rd
+        color = (153, 153, 0) if i == 0 else (192, 192, 192) if i == 1 else (153, 102, 0) if i == 2 else (255, 255, 255)
+        add_text(win, score[0], size=30, x=TOP_LEFT_X + PLAY_WIDTH/2 - 140, y=90+(30*i), color=color)
+        add_text(win, str(score[1]), size=30, x=TOP_LEFT_X + PLAY_WIDTH / 2 + 100, y=90+(30*i), color=color)
+    run = True
+    while run:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                run = False
+        pygame.display.update()
+
+
+def update_leaderboard(win, score):
     win.fill((0, 0, 0))
     add_text(win, 'Please Enter Name', x=250, y=150, size=40)
     font = pygame.font.Font(None, 32)
@@ -344,6 +355,7 @@ def high_score_screen(win, score):
                         else:
                             update_score(score, text)
                             run = False
+                            break
                     elif event.key == pygame.K_BACKSPACE:
                         text = text[:-1]
                     else:
