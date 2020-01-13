@@ -1,0 +1,4 @@
+*.pyc
+scores.txt
+.idea/*
+venv/*
